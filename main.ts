@@ -20,6 +20,20 @@ const EXPECTED_IMAGE = "meme.png";
 const X_POST_RE =
   /^https:\/\/(www\.|mobile\.)?(x\.com|twitter\.com)\/([^/]+\/status\/\d+|i\/web\/status\/\d+)/;
 
+// Canonicalize the X post URL: strip tracking query/fragment and
+// normalize the host to x.com, so a raw link copied from X (which often
+// carries ?a=...&s=... params) still yields the canonical post address
+// the house reads. The regex above already guarantees the shape; this
+// only drops the parts after the status id.
+function canonicalPostUrl(raw: string): string {
+  const m = raw.match(
+    /^https:\/\/(?:www\.|mobile\.)?(?:x\.com|twitter\.com)\/([^/]+)\/status\/(\d+)/,
+  );
+  if (m) return `https://x.com/${m[1]}/status/${m[2]}`;
+  // i/web/status/<id> has no username to restore; strip query/fragment only.
+  return raw.split(/[?#]/, 1)[0];
+}
+
 function readTextIfExists(filePath: string): string | null {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -129,6 +143,7 @@ function main(): number {
     console.error(`POST.json url is not an X post URL: ${postUrl}`);
     return 1;
   }
+  postUrl = canonicalPostUrl(postUrl);
 
   // Caption checks are advisory only: the post on X is what is judged.
   const caption = readTextIfExists(path.join(snapshotDir, "CAPTION.txt"));
